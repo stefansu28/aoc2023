@@ -1,24 +1,45 @@
 const std = @import("std");
+const solutions = @import("solutions.zig").solution_array;
 
-pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+// pub const SolutionDef = @import("solution_def.zig").SolutionDef;
 
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
+fn runDay(day: u8) !void {
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
 
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
+    const example_path = try std.fmt.allocPrint(arena, "inputs/day{d}/example", .{ day });
+    var example_file = try std.fs.cwd().openFile(example_path, .{});
+    defer example_file.close();
 
-    try bw.flush(); // don't forget to flush!
+    std.log.info("\nRunning day {d}\n", .{day});
+    const example_solution1 = try solutions[day - 1].part1(example_file.reader());
+
+    std.log.info("example part1: {d}\n", .{example_solution1});
+
+    const input_path = try std.fmt.allocPrint(arena, "inputs/day{d}/input", .{ day });
+    var input_file = try std.fs.cwd().openFile(input_path, .{});
+    defer input_file.close();
+
+    const part1_solution = try solutions[day - 1].part1(input_file.reader());
+
+    std.log.info("part1: {d}\n", .{part1_solution});
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+pub fn main() !void {
+    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+
+    const args = try std.process.argsAlloc(arena);
+
+    if (args.len == 1) {
+        for (0..solutions.len) |n| {
+            try runDay(@intCast(n));
+        }
+    } else if (args.len > 1) {
+        const day = try std.fmt.parseUnsigned(u8, args[1], 10);
+        if (day < 0 or day >= solutions.len + 1) @panic("Invalid day specified");
+        try runDay(day);
+    }
 }
