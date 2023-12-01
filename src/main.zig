@@ -15,7 +15,7 @@ fn runDay(day: u8) !void {
     std.log.info("\nRunning day {d}\n", .{day});
     const example_solution1 = try solutions[day - 1].part1(example_file.reader());
 
-    std.log.info("example part1: {d}\n", .{example_solution1});
+    std.log.info("example part1: {d}", .{example_solution1});
 
     const input_path = try std.fmt.allocPrint(arena, "inputs/day{d}/input", .{ day });
     var input_file = try std.fs.cwd().openFile(input_path, .{});
@@ -23,7 +23,12 @@ fn runDay(day: u8) !void {
 
     const part1_solution = try solutions[day - 1].part1(input_file.reader());
 
-    std.log.info("part1: {d}\n", .{part1_solution});
+    std.log.info("part1: {d}", .{part1_solution});
+
+    try input_file.seekTo(0);
+    const part2_solution = try solutions[day - 1].part2(input_file.reader());
+
+    std.log.info("part2: {d}", .{part2_solution});
 }
 
 pub fn main() !void {
