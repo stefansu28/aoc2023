@@ -25,6 +25,11 @@ fn runDay(day: u8) !void {
 
     std.log.info("part1: {d}", .{part1_solution});
 
+    try example_file.seekTo(0);
+    const part2_example_solution = try solutions[day - 1].part2(example_file.reader());
+
+    std.log.info("example part2: {d}", .{part2_example_solution});
+
     try input_file.seekTo(0);
     const part2_solution = try solutions[day - 1].part2(input_file.reader());
 
@@ -40,7 +45,7 @@ pub fn main() !void {
 
     if (args.len == 1) {
         for (0..solutions.len) |n| {
-            try runDay(@intCast(n));
+            try runDay(@intCast(n + 1));
         }
     } else if (args.len > 1) {
         const day = try std.fmt.parseUnsigned(u8, args[1], 10);
