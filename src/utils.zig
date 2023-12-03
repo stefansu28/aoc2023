@@ -113,3 +113,112 @@ test "untilSet" {
     try std.testing.expectEqualSlices(u8, "more", parser.untilSet(",;"));
     try std.testing.expect(parser.pos >= parser.buf.len);
 }
+
+/// Grid abstraction over strings
+pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
+    const LinesList = std.ArrayList([]u8);
+    const Allocator = std.mem.Allocator;
+    return struct {
+        allocator: Allocator,
+        lines: LinesList,
+
+        const SearchIterator = struct {
+            lines: *LinesList,
+            x: usize,
+            y: usize,
+            ch: u8,
+
+            const Entry = struct {
+                x: usize,
+                y: usize,
+            };
+
+            // pub fn next(self: *@This()) ?Entry {
+            //     if (self.y >= self.lines.items.len) return null;
+            //     const line = self.lines.items[self.y];
+            //     const entry = Entry {
+            //         .x = self.x,
+            //         .y = self.y,
+            //     };
+            //     self.x += 1;
+            //     if (self.x >= line.len) {
+            //         self.y += 1;
+            //         self.x = 0;
+            //     }
+
+            //     return entry;
+            // }
+        };
+
+        /// Return an optional character at the specified coordinates, if the coordinates are out of bound
+        pub fn get(self: *@This(), x: usize, y: usize) ?u8 {
+            if (y >= self.lines.items.len) return null;
+            const line = self.lines.items[y];
+            if (x >= line.len) return null;
+            return line[x];
+        }
+
+        /// Iterator that will return the coordinates of each instance of the specified character until the end of the grid.
+        /// Searches from left to right, top to bottom
+        pub fn searchIterator(self: *@This(), ch: u8) SearchIterator {
+            return .{
+                .lines = &self.lines,
+                .x = 0,
+                .y = 0,
+                .ch = ch,
+            };
+        }
+
+        //pub fn fromReader(allocator: Allocator, reader: std.fs.File.Reader) !@This() {
+        pub fn fromReader(allocator: Allocator, reader: anytype) !@This() {
+            var grid = @This() {
+                .allocator = allocator,
+                .lines = LinesList.init(allocator),
+            };
+
+            while (try reader.readUntilDelimiterOrEofAlloc(allocator, '\n', MAX_ROW_LENGTH)) |line| {
+                (try grid.lines.addOne()).* = line;
+            }
+
+            return grid;
+        }
+
+        pub fn deinit(self: *@This()) void {
+            self.lines.deinit();
+        }
+    };
+}
+
+const SliceReaderContext = struct {
+    slice: []const u8,
+    pos: usize = 0,
+};
+
+fn sliceReadFn(context: SliceReaderContext, buf: []u8) !usize {
+    if (context.pos >= context.slice.len) return 0;
+    var n: usize = 0;
+    while (n < buf.len and context.pos + n < context.slice.len) : (n += 1) {
+        buf[n] = context.slice[context.pos + n];
+    }
+
+    return n;
+}
+
+pub const SliceReader = std.io.GenericReader(SliceReaderContext, anyerror, sliceReadFn);
+
+
+test "Grid.get" {
+    const text =
+        \\123
+        \\456
+        \\789
+    ;
+    const reader = SliceReader {
+        .context = .{ .slice = text }
+    };
+
+    var grid = try Grid(3).fromReader(std.testing.allocator, reader);
+    defer grid.deinit();
+
+    try std.testing.expectEqual(@as(u8, '6'), grid.get(2, 1).?);
+}
