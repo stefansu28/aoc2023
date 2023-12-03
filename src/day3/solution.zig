@@ -33,9 +33,15 @@ pub fn part1(reader: Reader) !u64 {
                 var isPart = false;
                 const num: u64 = @intCast(as_usize);
 
-                const end = @min(parser.pos, parser.buf.len - 1);
+                const end = parser.pos;
+                const endPlus1 = @min(end+1, parser.buf.len);
 
-                if (line[start] != '.' or line[end] != '.') {
+                const startChar = line[start];
+                const endChar = line[@min(end, parser.buf.len - 1)];
+                if (startChar != '.' and !isDigit(startChar)) {
+                    isPart = true;
+                }
+                if (endChar != '.' and !isDigit(endChar)) {
                     isPart = true;
                 }
 
@@ -43,7 +49,7 @@ pub fn part1(reader: Reader) !u64 {
                 const next = if (row < lines.items.len - 1) lines.items[row + 1] else null;
 
                 if (prev) |prevLine| {
-                    for (prevLine[start..end]) |c| {
+                    for (prevLine[start..endPlus1]) |c| {
                         if (!isDigit(c) and c != '.') {
                             isPart = true;
                         }
@@ -51,7 +57,7 @@ pub fn part1(reader: Reader) !u64 {
                 }
 
                 if (next) |prevLine| {
-                    for (prevLine[start..end]) |c| {
+                    for (prevLine[start..endPlus1]) |c| {
                         if (!isDigit(c) and c != '.') {
                             isPart = true;
                         }
