@@ -1,7 +1,7 @@
 const std = @import("std");
 const Reader = std.fs.File.Reader;
 
-const Parser = @import("../util.zig").Parser;
+const Parser = @import("../utils.zig").Parser;
 
 inline fn isDigit(c: u8) bool {
     return c >= '0' and c <= '9';
