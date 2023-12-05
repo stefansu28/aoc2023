@@ -64,15 +64,15 @@ pub fn part1(reader: Reader) !u64 {
                     }
                 }
                 if (isPart) {
-                    std.log.debug("{}", .{num});
-                    if (prev) |prevLine| {
-                        std.log.debug("{s}", .{prevLine});
-                    }
-                    std.log.debug("{s}", .{line});
-                    if (next) |prevLine| {
-                        std.log.debug("{s}", .{prevLine});
-                    }
-                    std.log.debug("\n\n", .{});
+                    // std.log.debug("{}", .{num});
+                    // if (prev) |prevLine| {
+                    //     std.log.debug("{s}", .{prevLine});
+                    // }
+                    // std.log.debug("{s}", .{line});
+                    // if (next) |prevLine| {
+                    //     std.log.debug("{s}", .{prevLine});
+                    // }
+                    // std.log.debug("\n\n", .{});
                     sum += num;
                 }
             } else {
