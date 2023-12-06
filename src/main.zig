@@ -1,39 +1,33 @@
 const std = @import("std");
 const solutions = @import("solutions.zig").solution_array;
 
-// pub const SolutionDef = @import("solution_def.zig").SolutionDef;
+pub const solution_part = @import("solution_def.zig").solution_part;
 
 fn runDay(day: u8) !void {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const example_path = try std.fmt.allocPrint(arena, "inputs/day{d}/example", .{ day });
-    var example_file = try std.fs.cwd().openFile(example_path, .{});
-    defer example_file.close();
+    const solution = solutions[day - 1];
+
+    const CombinationTuple = struct {solution_part, u2, []const u8 };
+    const combinationTuple = [_]CombinationTuple {
+        .{ solution.part1, 1, "example" },
+        .{ solution.part1, 1, "input" },
+        .{ solution.part2, 2, "example" },
+        .{ solution.part2, 2, "input" },
+    };
 
     std.log.info("\nRunning day {d}\n", .{day});
-    const part1_example_solution = try solutions[day - 1].part1(example_file.reader());
+    for (combinationTuple) |tuple| {
+        const input_path = try std.fmt.allocPrint(arena, "inputs/day{d}/{s}", .{ day, tuple[2] });
+        var input_file = try std.fs.cwd().openFile(input_path, .{});
+        defer input_file.close();
 
-    std.log.info("example part1: {d}", .{part1_example_solution});
+        const answer = try tuple[0](input_file.reader());
 
-    const input_path = try std.fmt.allocPrint(arena, "inputs/day{d}/input", .{ day });
-    var input_file = try std.fs.cwd().openFile(input_path, .{});
-    defer input_file.close();
-
-    const part1_solution = try solutions[day - 1].part1(input_file.reader());
-
-    std.log.info("part1: {d}", .{part1_solution});
-
-    try example_file.seekTo(0);
-    const part2_example_solution = try solutions[day - 1].part2(example_file.reader());
-
-    std.log.info("example part2: {d}", .{part2_example_solution});
-
-    try input_file.seekTo(0);
-    const part2_solution = try solutions[day - 1].part2(input_file.reader());
-
-    std.log.info("part2: {d}", .{part2_solution});
+        std.log.info("part{d} {s}: {d}", .{tuple[1], tuple[2], answer});
+    }
 }
 
 pub fn main() !void {
