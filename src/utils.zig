@@ -1,6 +1,7 @@
 const std = @import("std");
 
 // Most of this is stolen from std.fmt.Parser;
+// TODO: Composition over inheritence
 pub const Parser = struct {
     buf: []const u8,
     pos: usize = 0,
@@ -83,6 +84,10 @@ pub const Parser = struct {
             }
         }
         return self.buf[start..self.pos];
+    }
+
+    pub fn eatSpaces(self: *@This()) void {
+        while (self.maybe(' ')) {}
     }
 };
 
