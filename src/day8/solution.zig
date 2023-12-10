@@ -14,22 +14,66 @@ pub fn part1(reader: Reader) !u64 {
     var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena_state.deinit();
     const arena = arena_state.allocator();
-    _ = arena;
 
     var dirBuf: [512]u8 = undefined;
-    const dirs = try reader.readUntilDelimiter(dirBuf, '\n');
-    _ = dirs;
+    const dirs = try reader.readUntilDelimiter(&dirBuf, '\n');
     var dirIndex: usize = 0;
-    _ = dirIndex;
+
+    var network = NodeNetwork.init(arena);
+
+    var initialNode: ?ID = null;
 
     var buf: [32]u8 = undefined;
     while (try reader.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        _ = line;
-    
-        
+        if (line.len == 0) continue;
+
+        var parser = Parser { .buf = line };
+        const idSlice = parser.until(' ');
+        if (idSlice.len != 3) return error.ParseError;
+        var id: ID = undefined;
+        std.mem.copy(u8, &id, idSlice);
+        if (!parser.maybeSlice(" = (")) return error.ParseError;
+
+        const left = parser.until(',');
+        _ = parser.char(); // consume ',';
+        parser.eatSpaces();
+        const right = parser.until(')');
+
+        // std.log.debug("{s} = ({s} {s})", .{id, left, right});
+        var node: Node = undefined;
+        std.mem.copy(u8, &node.left, left);
+        std.mem.copy(u8, &node.right, right);
+
+        try network.put(id, node);
+
+        if (initialNode == null) initialNode = id;
     }
 
-    @panic("TODO");
+    // var iter = network.iterator();
+    // while (iter.next()) |entry| {
+    //     const id = entry.key_ptr.*;
+    //     const node = entry.value_ptr.*;
+    //     std.log.debug("{s} = ({s} {s})", .{id, node.left, node.right});
+    // }
+
+    var currentNode: ID = initialNode.?;
+    while (!std.mem.eql(u8, &currentNode, "ZZZ")) {
+        const node = network.get(currentNode).?;
+        const dir = dirs[dirIndex % dirs.len];
+        // std.log.debug("{s} = ({s} {s})", .{currentNode, node.left, node.right});
+        // std.log.debug("dir: {s}, index: {}", .{if (dir == 'L') "left" else "right", dirIndex});
+        if (dir == 'L') {
+            currentNode = node.left;
+        } else if (dir == 'R') {
+            currentNode = node.right;
+        } else {
+            unreachable;
+        }
+
+        dirIndex += 1;
+    }
+
+    return @intCast(dirIndex);
 }
 
 pub fn part2(reader: Reader) !u64 {
