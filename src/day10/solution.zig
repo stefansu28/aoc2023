@@ -8,8 +8,17 @@ pub fn part1(reader: Reader) !u64 {
     defer arena_state.deinit();
     const arena = arena_state.allocator();
 
-    const grid = Grid.fromReader(arena, reader);
+    var grid = try Grid.fromReader(arena, reader);
     defer grid.deinit();
+
+    for (grid.lines.items) |line| {
+        std.log.debug("{s}", .{line});
+    }
+
+    var iter = grid.searchIterator('S');
+    const start = iter.next().?;
+
+    std.log.debug("start: {any}", .{start});
 
     @panic("TODO");
 }

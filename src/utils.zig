@@ -129,7 +129,7 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
         lines: LinesList,
 
         const SearchIterator = struct {
-            lines: *LinesList,
+            lines: *const LinesList,
             x: usize,
             y: usize,
             ch: u8,
@@ -139,21 +139,27 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
                 y: usize,
             };
 
-            // pub fn next(self: *@This()) ?Entry {
-            //     if (self.y >= self.lines.items.len) return null;
-            //     const line = self.lines.items[self.y];
-            //     const entry = Entry {
-            //         .x = self.x,
-            //         .y = self.y,
-            //     };
-            //     self.x += 1;
-            //     if (self.x >= line.len) {
-            //         self.y += 1;
-            //         self.x = 0;
-            //     }
+            pub fn next(self: *@This()) ?Entry {
+                if (self.y >= self.lines.items.len) return null;
 
-            //     return entry;
-            // }
+                while (self.y < self.lines.items.len) {
+                    const line = self.lines.items[self.y];
+                    if (self.x >= line.len) {
+                        self.y += 1;
+                        self.x = 0;
+                        continue;
+                    }
+                    defer self.x += 1;
+                    if (line[self.x] == self.ch) {
+                        return Entry {
+                            .x = self.x,
+                            .y = self.y,
+                        };
+                    }
+                }
+
+                return null;
+            }
         };
 
         /// Return an optional character at the specified coordinates, if the coordinates are out of bound
@@ -166,7 +172,7 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
 
         /// Iterator that will return the coordinates of each instance of the specified character until the end of the grid.
         /// Searches from left to right, top to bottom
-        pub fn searchIterator(self: *@This(), ch: u8) SearchIterator {
+        pub fn searchIterator(self: *const @This(), ch: u8) SearchIterator {
             return .{
                 .lines = &self.lines,
                 .x = 0,
@@ -234,4 +240,30 @@ test "Grid.get" {
     try std.testing.expectEqual(@as(?u8, null), grid.get(3, 1));
     try std.testing.expectEqual(@as(?u8, '5'), grid.get(1, 1));
     try std.testing.expectEqual(@as(?u8, null), grid.get(2, 10));
+}
+
+test "Grid.searchIterator" {
+    const text =
+        \\||3
+        \\4|6
+        \\78|
+    ;
+    var context = SliceReaderContext { .slice = text };
+    const reader = SliceReader {
+        .context = &context,
+    };
+
+    const GridType = Grid(5);
+    const EntryType = GridType.SearchIterator.Entry;
+
+    var grid = try GridType.fromReader(std.testing.allocator, reader);
+    defer grid.deinit();
+
+    var iter = grid.searchIterator('|');
+    try std.testing.expectEqual(@as(?EntryType, .{.x = 0, .y = 0 }), iter.next());
+    try std.testing.expectEqual(@as(?EntryType, .{.x = 1, .y = 0 }), iter.next());
+    try std.testing.expectEqual(@as(?EntryType, .{.x = 1, .y = 1 }), iter.next());
+    try std.testing.expectEqual(@as(?EntryType, .{.x = 2, .y = 2 }), iter.next());
+    try std.testing.expectEqual(@as(?EntryType, null), iter.next());
+    try std.testing.expectEqual(@as(?EntryType, null), iter.next());
 }
