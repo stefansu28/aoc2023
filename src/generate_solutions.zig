@@ -1,7 +1,21 @@
 const std = @import("std");
+const Parser = std.fmt.Parser;
+
+fn parseNum(text: []const u8) usize {
+    var parser = Parser{ .buf = text };
+    while (parser.peek(0)) |ch| {
+        if (std.ascii.isDigit(ch)) break;
+        _ = parser.char();
+    }
+
+    return parser.number().?;
+}
 
 fn compareStrings(_: void, lhs: []const u8, rhs: []const u8) bool {
-    return std.mem.order(u8, lhs, rhs).compare(std.math.CompareOperator.lt);
+    const lhsNum = parseNum(lhs);
+    const rhsNum = parseNum(rhs);
+
+    return lhsNum < rhsNum;
 }
 
 pub fn main() !void {
