@@ -121,6 +121,7 @@ test "untilSet" {
 
 /// Grid abstraction over strings
 pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
+
     const LinesList = std.ArrayList([]u8);
     const Allocator = std.mem.Allocator;
     return struct {
@@ -189,6 +190,9 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
         }
 
         pub fn deinit(self: *@This()) void {
+            for (self.lines.items) |line| {
+                self.allocator.free(line);
+            }
             self.lines.deinit();
         }
     };
@@ -199,18 +203,18 @@ const SliceReaderContext = struct {
     pos: usize = 0,
 };
 
-fn sliceReadFn(context: SliceReaderContext, buf: []u8) !usize {
+fn sliceReadFn(context: *SliceReaderContext, buf: []u8) !usize {
     if (context.pos >= context.slice.len) return 0;
     var n: usize = 0;
     while (n < buf.len and context.pos + n < context.slice.len) : (n += 1) {
         buf[n] = context.slice[context.pos + n];
     }
 
+    context.pos += n;
     return n;
 }
 
-pub const SliceReader = std.io.GenericReader(SliceReaderContext, anyerror, sliceReadFn);
-
+pub const SliceReader = std.io.GenericReader(*SliceReaderContext, anyerror, sliceReadFn);
 
 test "Grid.get" {
     const text =
@@ -218,12 +222,16 @@ test "Grid.get" {
         \\456
         \\789
     ;
+    var context = SliceReaderContext { .slice = text };
     const reader = SliceReader {
-        .context = .{ .slice = text }
+        .context = &context,
     };
 
-    var grid = try Grid(3).fromReader(std.testing.allocator, reader);
+    var grid = try Grid(5).fromReader(std.testing.allocator, reader);
     defer grid.deinit();
 
-    try std.testing.expectEqual(@as(u8, '6'), grid.get(2, 1).?);
+    try std.testing.expectEqual(@as(?u8, '6'), grid.get(2, 1));
+    try std.testing.expectEqual(@as(?u8, null), grid.get(3, 1));
+    try std.testing.expectEqual(@as(?u8, '5'), grid.get(1, 1));
+    try std.testing.expectEqual(@as(?u8, null), grid.get(2, 10));
 }
