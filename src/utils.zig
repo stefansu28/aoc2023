@@ -128,13 +128,13 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
         allocator: Allocator,
         lines: LinesList,
 
-        const SearchIterator = struct {
+        pub const SearchIterator = struct {
             lines: *const LinesList,
             x: usize,
             y: usize,
             ch: u8,
 
-            const Entry = struct {
+            pub const Entry = struct {
                 x: usize,
                 y: usize,
             };
@@ -163,7 +163,7 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
         };
 
         /// Return an optional character at the specified coordinates, if the coordinates are out of bound
-        pub fn get(self: *@This(), x: usize, y: usize) ?u8 {
+        pub fn get(self: *const @This(), x: usize, y: usize) ?u8 {
             if (y >= self.lines.items.len) return null;
             const line = self.lines.items[y];
             if (x >= line.len) return null;
