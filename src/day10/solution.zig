@@ -18,7 +18,7 @@ const Pos = struct {
 const PositionSet = std.AutoHashMap(Pos, void);
 const PosQueue = std.ArrayList(Pos);
 
-fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
+fn getAdjacent(pos: Pos, grid: *Grid) ![2]Pos {
     const ch = grid.get(pos.x, pos.y).?;
 
     return switch (ch) {
@@ -55,10 +55,16 @@ fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
             const north = if (pos.y > 0) grid.get(pos.x, pos.y - 1) else null;
             const south = grid.get(pos.x, pos.y + 1);
 
+            var hasWest = false;
+            var hasEast = false;
+            var hasNorth = false;
+            var hasSouth = false;
+
             if (west) |westVal| {
                 if (westVal == '-' or westVal == 'L' or westVal == 'F') {
                     neighbors[count] = Pos{ .x = pos.x - 1, .y = pos.y};
                     count += 1;
+                    hasWest = true;
                 }
             }
 
@@ -66,6 +72,7 @@ fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
                 if (eastVal == '-' or eastVal == '7' or eastVal == 'J') {
                     neighbors[count] = Pos{ .x = pos.x + 1, .y = pos.y};
                     count += 1;
+                    hasEast = true;
                 }
             }
 
@@ -73,6 +80,7 @@ fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
                 if (northVal == '|' or northVal == '7' or northVal == 'F') {
                     neighbors[count] = Pos{ .x = pos.x, .y = pos.y - 1};
                     count += 1;
+                    hasNorth = true;
                 }
             }
 
@@ -80,8 +88,16 @@ fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
                 if (southVal == '|' or southVal == 'J' or southVal == 'L') {
                     neighbors[count] = Pos{ .x = pos.x, .y = pos.y + 1};
                     count += 1;
+                    hasSouth = true;
                 }
             }
+
+            if (hasNorth and hasSouth) try grid.set(pos.x, pos.y, '|');
+            if (hasWest and hasEast) try grid.set(pos.x, pos.y, '-');
+            if (hasWest and hasNorth) try grid.set(pos.x, pos.y, 'J');
+            if (hasWest and hasSouth) try grid.set(pos.x, pos.y, '7');
+            if (hasEast and hasNorth) try grid.set(pos.x, pos.y, 'L');
+            if (hasEast and hasSouth) try grid.set(pos.x, pos.y, 'F');
 
             break :blk neighbors;
         },
@@ -89,7 +105,7 @@ fn getAdjacent(pos: Pos, grid: *const Grid) [2]Pos {
     };
 }
 
-fn dijkstras(allocator: std.mem.Allocator, grid: *const Grid, start: Pos) !PositionSet {
+fn dijkstras(allocator: std.mem.Allocator, grid: *Grid, start: Pos) !PositionSet {
     var q = PosQueue.init(allocator);
     defer q.deinit();
 
@@ -102,7 +118,7 @@ fn dijkstras(allocator: std.mem.Allocator, grid: *const Grid, start: Pos) !Posit
         const pos = q.orderedRemove(0);
         try visited.put(pos, {});
 
-        const neighbors = getAdjacent(pos, grid);
+        const neighbors = try getAdjacent(pos, grid);
         for (neighbors) |neighbor| {
             if (!visited.contains(neighbor)) {
                 try q.append(neighbor);
@@ -158,42 +174,33 @@ fn getAdjacentEmpty(pos: Pos, grid: *const Grid) [4]?Pos {
     return adjacent;
 }
 
-const FillSearchResults = struct {
-    visited: PositionSet,
-    inside: bool,
+const CrossedResults = struct {
+    crossed: bool,
+    deltaX: usize,
 };
 
-fn fillSearch(allocator: std.mem.Allocator, grid: *const Grid, outside: *PositionSet, start: Pos) !FillSearchResults {
-    var arena_state = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena_state.deinit();
-    const arena = arena_state.allocator();
+fn crossedPipe(startingPos: Pos, row: []u8) CrossedResults {
+    var pos = startingPos;
 
-    var q = PosQueue.init(arena);
-    defer q.deinit();
+    if (row[pos.x] == '|') return .{.crossed = true, .deltaX = 0};
 
-    var visited = PositionSet.init(allocator);
-    var inside = true;
+    const closing: u8 = switch (row[pos.x]) {
+        'F' => 'J',
+        'L' => '7',
+        else => {
+            std.log.debug("{any}: {}", .{pos, row[pos.x]});
+            unreachable;
+        },
+    };
 
-    try q.append(start);
-    try visited.put(start, {});
+    pos.x += 1;
 
-    while (q.items.len > 0) {
-        const pos = q.orderedRemove(0);
-        try visited.put(pos, {});
+    while (row[pos.x] == '-') : (pos.x += 1) {}
 
-        const neighbors = getAdjacentEmpty(pos, grid);
-        for (neighbors) |neighborOpt| {
-            if (neighborOpt) |neighbor| {
-                if (outside.contains(neighbor)) inside = false;
-
-                if (!visited.contains(neighbor)) {
-                    try q.append(neighbor);
-                }
-            }
-        }
-    }
-
-    return .{.visited = visited, .inside = inside};
+    return .{
+        .crossed = row[pos.x] == closing,
+        .deltaX = pos.x - startingPos.x,
+    };
 }
 
 pub fn part2(reader: Reader) !u64 {
@@ -210,57 +217,36 @@ pub fn part2(reader: Reader) !u64 {
     var pipe = try dijkstras(arena, &grid, Pos.fromEntry(start));
     defer pipe.deinit();
 
-    var outside = PositionSet.init(arena);
-    defer outside.deinit();
-
-    for ([_]usize {0, grid.lines.items.len - 1}) |y| {
-        const row = grid.lines.items[y];
-        for (0..row.len) |x| {
-            if (grid.get(x, y).? == '.') try outside.put(.{.x = x, .y = y}, {});
-        }
-    }
+    var insideCount: u64 = 0;
 
     for (0..grid.lines.items.len) |y| {
         const row = grid.lines.items[y];
-        for ([_]usize{0,row.len-1}) |x| {
-            if (grid.get(x, y).? == '.') try outside.put(.{.x = x, .y = y}, {});
-        }
-    }
+        var x: usize = 0;
+        var insideInc: u64 = 0;
 
-    for (0..grid.lines.items.len) |y| {
-        const row = grid.lines.items[y];
-        var buf: [256]u8 = undefined;
-        for (0..row.len) |x| {
-            if (false and outside.contains(.{.x = x, .y = y })) {
-                buf[x] = 'O';
+        while (x < row.len) : (x += 1) {
+            const pos = Pos { .x = x, .y = y };
+
+            if (!pipe.contains(pos)) {
+                insideCount += insideInc;
+                if (insideInc == 1) {
+                    row[x] = 'I';
+                }
             } else {
-                buf[x] = row[x];
-            }
-        }
-        std.log.debug("{s}", .{buf[0..row.len]});
-    }
-
-    var inside: u64 = 0;
-
-    for (1..grid.lines.items.len-1) |y| {
-        const row = grid.lines.items[y];
-        for (0..row.len) |x| {
-            if (pipe.contains(.{.x = x, .y = y})) continue;
-            if (outside.contains(.{.x = x, .y = y})) continue;
-
-            var fillResults = try fillSearch(arena, &grid, &outside, .{ .x = x, .y = y });
-            defer fillResults.visited.deinit();
-
-            if (fillResults.inside) {
-                inside += fillResults.visited.unmanaged.size;
-            } else {
-                var posIter = fillResults.visited.keyIterator();
-                while (posIter.next()) |pos| {
-                    try outside.put(pos.*, {});
+                const results = crossedPipe(pos, row);
+                // for (x..x + results.deltaX + 1) |_x| {
+                //     row[_x] = 'P';
+                // }
+                x += results.deltaX;
+                if (results.crossed) {
+                    // row[x] = 'C';
+                    insideInc = (insideInc + 1) % 2;
                 }
             }
         }
+
+        // std.log.debug("{s}", .{row});
     }
 
-    return inside;
+    return insideCount;
 }

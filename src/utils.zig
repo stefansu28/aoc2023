@@ -170,6 +170,13 @@ pub fn Grid(comptime MAX_ROW_LENGTH: comptime_int) type {
             return line[x];
         }
 
+        pub fn set(self: *const @This(), x: usize, y: usize, ch: u8) !void {
+            if (y >= self.lines.items.len) return error.RowOutOfBounds;
+            const line = self.lines.items[y];
+            if (x >= line.len) return error.ColOutOfBounds;
+            line[x] = ch;
+        }
+
         /// Iterator that will return the coordinates of each instance of the specified character until the end of the grid.
         /// Searches from left to right, top to bottom
         pub fn searchIterator(self: *const @This(), ch: u8) SearchIterator {
